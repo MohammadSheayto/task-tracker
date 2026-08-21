@@ -80,3 +80,60 @@ def test_overdue_false_filter_excludes_overdue_tasks():
     ids = [task["id"] for task in response.json()]
     assert future["id"] in ids
     assert len(ids) == 1
+
+
+# --- Feature 2: tags / labels ---
+
+
+def test_create_task_with_tags_trims_and_dedupes():
+    body = create_task(tags=["  frontend ", "bug", "frontend"])
+    assert body["tags"] == ["frontend", "bug"]
+
+
+def test_create_task_without_tags_defaults_to_empty_list():
+    body = create_task()
+    assert body["tags"] == []
+
+
+def test_create_task_blank_tag_returns_422():
+    response = client.post("/tasks", json={"title": "x", "tags": ["ok", "   "]})
+    assert response.status_code == 422
+    assert "blank" in str(response.json()["detail"]).lower()
+
+
+def test_create_task_too_many_tags_returns_422():
+    response = client.post("/tasks", json={"title": "x", "tags": [f"t{i}" for i in range(11)]})
+    assert response.status_code == 422
+    assert "at most" in str(response.json()["detail"]).lower()
+
+
+def test_patch_tags_replaces_list():
+    task = create_task(tags=["old"])
+    response = client.patch(f"/tasks/{task['id']}", json={"tags": ["new-a", "new-b"]})
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["new-a", "new-b"]
+
+
+def test_tags_preserved_after_unrelated_patch():
+    task = create_task(tags=["keep-me"])
+    response = client.patch(f"/tasks/{task['id']}", json={"status": "InProgress"})
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["keep-me"]
+
+
+def test_filter_by_tag_returns_only_matching_tasks():
+    tagged = create_task(title="Tagged", tags=["backend"])
+    create_task(title="Other tag", tags=["frontend"])
+    create_task(title="No tags")
+
+    response = client.get("/tasks", params={"tag": "backend"})
+    assert response.status_code == 200
+    ids = [task["id"] for task in response.json()]
+    assert ids == [tagged["id"]]
+
+
+def test_filter_by_unknown_tag_returns_empty_list():
+    create_task(tags=["backend"])
+    response = client.get("/tasks", params={"tag": "nope"})
+    assert response.status_code == 200
+    assert response.json() == []

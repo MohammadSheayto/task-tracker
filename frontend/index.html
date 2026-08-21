@@ -81,6 +81,43 @@
     }
     .due-pill.overdue { background: #fdecec; color: #8c1d18; }
 
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin: 0 0 0.45rem;
+    }
+    .tag-chip {
+      font: inherit;
+      font-size: 0.74rem;
+      border: 1px solid #c8cdd8;
+      border-radius: 999px;
+      background: #f4f6fa;
+      color: #33415e;
+      padding: 0.05rem 0.5rem;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+    .tag-chip:hover { background: #e8edf7; }
+
+    .active-tag-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #e8edf7;
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      color: #33415e;
+    }
+    .active-tag-filter button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      font-weight: 700;
+      padding: 0;
+    }
+
     /* Board UI states */
     #board-state {
       margin: 1rem 1.5rem 0;
@@ -258,6 +295,7 @@
 
   <div class="filter-bar">
     <label><input type="checkbox" id="overdue-filter" /> Overdue only</label>
+    <span id="tag-filter-slot"></span>
   </div>
 
   <div id="board-state" hidden></div>
@@ -339,6 +377,11 @@
           <input type="date" id="task-due-date" />
         </div>
 
+        <div class="field">
+          <label for="task-tags">Tags (comma-separated)</label>
+          <input type="text" id="task-tags" autocomplete="off" placeholder="e.g. backend, urgent" />
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn" id="modal-cancel">Cancel</button>
           <button type="submit" class="btn btn-primary" id="modal-submit">Create Task</button>
@@ -353,7 +396,7 @@
     const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
     let tasks = [];
-    const filters = { overdue: false };
+    const filters = { overdue: false, tag: null };
 
     function isOverdue(task) {
       const today = new Date().toISOString().slice(0, 10);
@@ -414,12 +457,37 @@
     function buildTasksUrl() {
       const params = new URLSearchParams();
       if (filters.overdue) params.set("overdue", "true");
+      if (filters.tag) params.set("tag", filters.tag);
       const query = params.toString();
       return query ? `${API_BASE}/tasks?${query}` : `${API_BASE}/tasks`;
     }
 
     function hasActiveFilters() {
-      return filters.overdue;
+      return filters.overdue || Boolean(filters.tag);
+    }
+
+    function setTagFilter(tag) {
+      filters.tag = tag;
+      renderTagFilterSlot();
+      loadTasks();
+    }
+
+    function renderTagFilterSlot() {
+      const slot = document.getElementById("tag-filter-slot");
+      slot.textContent = "";
+      if (!filters.tag) return;
+      const chip = document.createElement("span");
+      chip.className = "active-tag-filter";
+      const label = document.createElement("span");
+      label.textContent = `Tag: ${filters.tag}`;
+      chip.appendChild(label);
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.setAttribute("aria-label", "Clear tag filter");
+      clear.textContent = "×";
+      clear.addEventListener("click", () => setTagFilter(null));
+      chip.appendChild(clear);
+      slot.appendChild(chip);
     }
 
     async function loadTasks() {
@@ -495,6 +563,21 @@
         description.className = "description";
         description.textContent = task.description;
         card.appendChild(description);
+      }
+
+      if (task.tags && task.tags.length > 0) {
+        const tagRow = document.createElement("div");
+        tagRow.className = "tag-row";
+        for (const tag of task.tags) {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "tag-chip";
+          chip.textContent = tag;
+          chip.title = `Filter by tag "${tag}"`;
+          chip.addEventListener("click", () => setTagFilter(tag));
+          tagRow.appendChild(chip);
+        }
+        card.appendChild(tagRow);
       }
 
       const meta = document.createElement("div");
@@ -607,7 +690,15 @@
       priority: document.getElementById("task-priority"),
       assignee: document.getElementById("task-assignee"),
       dueDate: document.getElementById("task-due-date"),
+      tags: document.getElementById("task-tags"),
     };
+
+    function parseTagsInput(value) {
+      return value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0);
+    }
 
     function clearFormErrors() {
       formError.classList.remove("visible");
@@ -628,6 +719,7 @@
         fields.priority.value = task.priority;
         fields.assignee.value = task.assignee || "";
         fields.dueDate.value = task.due_date || "";
+        fields.tags.value = (task.tags || []).join(", ");
       } else {
         modalTitle.textContent = "New Task";
         modalSubmit.textContent = "Create Task";
@@ -671,6 +763,7 @@
         priority: fields.priority.value,
         assignee: fields.assignee.value.trim() || null, // null when blank
         due_date: fields.dueDate.value || null, // ISO yyyy-mm-dd from the date input
+        tags: parseTagsInput(fields.tags.value), // [] clears tags on edit
       };
 
       const taskId = fields.id.value;

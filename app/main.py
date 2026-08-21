@@ -66,17 +66,20 @@ def _is_overdue(task: TaskResponse) -> bool:
 
 
 @app.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])
-def list_tasks(overdue: bool | None = None) -> list[TaskResponse]:
+def list_tasks(overdue: bool | None = None, tag: str | None = None) -> list[TaskResponse]:
     """List tasks in insertion order.
 
     Query parameters:
         overdue: If true, return only overdue tasks (due date before today
             and status not Done). If false, return only non-overdue tasks.
             Omit to return all tasks.
+        tag: Return only tasks carrying this exact tag.
     """
     tasks = storage.get_all_tasks()
     if overdue is not None:
         tasks = [task for task in tasks if _is_overdue(task) == overdue]
+    if tag is not None:
+        tasks = [task for task in tasks if tag in task.tags]
     return tasks
 
 

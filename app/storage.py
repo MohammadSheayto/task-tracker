@@ -43,6 +43,7 @@ class TaskStorage:
             "priority": task_create.priority,
             "assignee": task_create.assignee,
             "due_date": task_create.due_date,
+            "tags": list(task_create.tags),
             "created_at": now,
             "updated_at": now,
         }
@@ -103,6 +104,8 @@ class TaskStorage:
             task_data["assignee"] = task_update.assignee
         if task_update.due_date is not None:
             task_data["due_date"] = task_update.due_date
+        if task_update.tags is not None:
+            task_data["tags"] = list(task_update.tags)
 
         # Always update the updated_at timestamp
         task_data["updated_at"] = datetime.now(timezone.utc)
