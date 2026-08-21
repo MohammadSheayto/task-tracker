@@ -4,14 +4,14 @@ FastAPI application per ADR-001. In-memory storage backend with
 CRUD endpoints for tasks; CORS enabled for the local Module 3 frontend.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
 from app.config import APP_ENV
-from app.models import TaskCreate, TaskResponse, TaskUpdate
+from app.models import TaskCreate, TaskResponse, TaskStatus, TaskUpdate
 
 app = FastAPI(
     title="Task Tracker API",
@@ -56,10 +56,28 @@ def create_task(payload: TaskCreate) -> TaskResponse:
     return storage.add_task(payload)
 
 
+def _is_overdue(task: TaskResponse) -> bool:
+    """A task is overdue when its due date has passed and it is not Done."""
+    return (
+        task.due_date is not None
+        and task.due_date < date.today()
+        and task.status != TaskStatus.DONE
+    )
+
+
 @app.get("/tasks", response_model=list[TaskResponse], tags=["tasks"])
-def list_tasks() -> list[TaskResponse]:
-    """List all tasks in insertion order."""
-    return storage.get_all_tasks()
+def list_tasks(overdue: bool | None = None) -> list[TaskResponse]:
+    """List tasks in insertion order.
+
+    Query parameters:
+        overdue: If true, return only overdue tasks (due date before today
+            and status not Done). If false, return only non-overdue tasks.
+            Omit to return all tasks.
+    """
+    tasks = storage.get_all_tasks()
+    if overdue is not None:
+        tasks = [task for task in tasks if _is_overdue(task) == overdue]
+    return tasks
 
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])

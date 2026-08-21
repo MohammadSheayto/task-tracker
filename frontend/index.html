@@ -54,6 +54,33 @@
     #notice.visible { display: flex; justify-content: space-between; gap: 1rem; }
     #notice button { background: none; border: none; cursor: pointer; color: inherit; font-weight: 600; }
 
+    /* Filter bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem 0;
+      font-size: 0.9rem;
+      color: #5a6272;
+      flex-wrap: wrap;
+    }
+    .filter-bar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+    }
+
+    .due-pill {
+      border-radius: 999px;
+      padding: 0.1rem 0.55rem;
+      font-weight: 600;
+      background: #e8edf7;
+      color: #33415e;
+      white-space: nowrap;
+    }
+    .due-pill.overdue { background: #fdecec; color: #8c1d18; }
+
     /* Board UI states */
     #board-state {
       margin: 1rem 1.5rem 0;
@@ -229,6 +256,10 @@
     <button type="button" id="notice-dismiss" aria-label="Dismiss message">&times;</button>
   </div>
 
+  <div class="filter-bar">
+    <label><input type="checkbox" id="overdue-filter" /> Overdue only</label>
+  </div>
+
   <div id="board-state" hidden></div>
 
   <main class="board" id="board">
@@ -303,6 +334,11 @@
           <input type="text" id="task-assignee" autocomplete="off" />
         </div>
 
+        <div class="field">
+          <label for="task-due-date">Due date</label>
+          <input type="date" id="task-due-date" />
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn" id="modal-cancel">Cancel</button>
           <button type="submit" class="btn btn-primary" id="modal-submit">Create Task</button>
@@ -317,6 +353,12 @@
     const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
     let tasks = [];
+    const filters = { overdue: false };
+
+    function isOverdue(task) {
+      const today = new Date().toISOString().slice(0, 10);
+      return Boolean(task.due_date) && task.due_date < today && task.status !== "Done";
+    }
 
     const boardState = document.getElementById("board-state");
     const notice = document.getElementById("notice");
@@ -362,19 +404,40 @@
 
     document.getElementById("notice-dismiss").addEventListener("click", hideNotice);
 
+    document.getElementById("overdue-filter").addEventListener("change", (event) => {
+      filters.overdue = event.target.checked;
+      loadTasks();
+    });
+
     // --- Fetch and render ---
+
+    function buildTasksUrl() {
+      const params = new URLSearchParams();
+      if (filters.overdue) params.set("overdue", "true");
+      const query = params.toString();
+      return query ? `${API_BASE}/tasks?${query}` : `${API_BASE}/tasks`;
+    }
+
+    function hasActiveFilters() {
+      return filters.overdue;
+    }
 
     async function loadTasks() {
       setBoardState("loading", "Loading tasks…");
       try {
-        const response = await fetch(`${API_BASE}/tasks`);
+        const response = await fetch(buildTasksUrl());
         if (!response.ok) {
           throw new Error(`GET /tasks returned ${response.status}`);
         }
         tasks = await response.json();
         renderBoard(tasks);
         if (tasks.length === 0) {
-          setBoardState("empty", "No tasks yet — create one with New Task.");
+          setBoardState(
+            "empty",
+            hasActiveFilters()
+              ? "No tasks match the current filters."
+              : "No tasks yet — create one with New Task."
+          );
         } else {
           setBoardState("ready");
         }
@@ -441,6 +504,14 @@
       priority.className = `priority priority-${task.priority}`;
       priority.textContent = task.priority;
       meta.appendChild(priority);
+
+      if (task.due_date) {
+        const due = document.createElement("span");
+        const overdue = isOverdue(task);
+        due.className = overdue ? "due-pill overdue" : "due-pill";
+        due.textContent = overdue ? `Overdue · ${task.due_date}` : `Due ${task.due_date}`;
+        meta.appendChild(due);
+      }
 
       const assignee = document.createElement("span");
       assignee.className = "assignee";
@@ -535,6 +606,7 @@
       status: document.getElementById("task-status"),
       priority: document.getElementById("task-priority"),
       assignee: document.getElementById("task-assignee"),
+      dueDate: document.getElementById("task-due-date"),
     };
 
     function clearFormErrors() {
@@ -555,6 +627,7 @@
         fields.status.value = task.status;
         fields.priority.value = task.priority;
         fields.assignee.value = task.assignee || "";
+        fields.dueDate.value = task.due_date || "";
       } else {
         modalTitle.textContent = "New Task";
         modalSubmit.textContent = "Create Task";
@@ -597,6 +670,7 @@
         status: fields.status.value,
         priority: fields.priority.value,
         assignee: fields.assignee.value.trim() || null, // null when blank
+        due_date: fields.dueDate.value || null, // ISO yyyy-mm-dd from the date input
       };
 
       const taskId = fields.id.value;
