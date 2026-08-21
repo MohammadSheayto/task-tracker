@@ -1,0 +1,36 @@
+# Secrets — never bake into the image
+.env
+
+# Version control
+.git
+.gitignore
+
+# Virtual environments
+venv
+.venv
+env
+
+# Python caches and test artifacts
+__pycache__
+*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+
+# Frontend is served separately; docs are not runtime files
+frontend
+docs
+tests
+
+# Node (if ever present)
+node_modules
+
+# Editor/OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Project memory / CI (not needed inside the image)
+CLAUDE.md
+.github

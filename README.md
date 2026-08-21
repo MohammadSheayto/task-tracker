@@ -1,128 +1,135 @@
 # Task Tracker
 
-A learning project: a REST API for tracking tasks, built with Python and
-FastAPI, plus a vanilla HTML/CSS/JavaScript Kanban board frontend
-(Module 3). Per ADR-001, the implementation uses an in-memory
-dictionary store, with a planned migration path to SQLite in a later
-module.
+## Project overview
 
-API endpoints: `GET /health`, `POST /tasks`, `GET /tasks`,
-`GET /tasks/{id}`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`.
+A learning project: a REST API for tracking tasks (Python/FastAPI, in-memory
+store per ADR-001) with a vanilla HTML/CSS/JavaScript Kanban board frontend.
+Built incrementally across course Modules 1–4: API + validation (M1–M2),
+Kanban frontend (M3), feature extensions on branch `mid-course-project`
+(due dates + overdue filter, tags), and CI/Docker/documentation hardening (M4).
 
-## Mid-Course Project (branch `mid-course-project`)
+API endpoints: `GET /health`, `POST /tasks` (201), `GET /tasks`
+(`?overdue=true|false`, `?tag=<value>`), `GET /tasks/{id}`,
+`PATCH /tasks/{id}`, `DELETE /tasks/{id}` (204). Unknown ids → 404,
+validation errors → 422.
 
-Two features added on top of Modules 1–3, end-to-end (backend +
-validation + pytest + frontend):
+## Prerequisites
 
-- **Due dates + overdue filter** — optional `due_date` on tasks
-  (invalid dates → 422), due/overdue pill on cards, "Overdue only"
-  board filter backed by `GET /tasks?overdue=true|false` (overdue =
-  due date before today and status not Done).
-- **Tags / labels** — `tags` list on tasks (trimmed, blank values →
-  422, deduped, max 10 tags × 30 chars), tag chips on cards,
-  click-a-chip tag filter backed by `GET /tasks?tag=<value>`.
-
-Project documentation (user stories, mini-ADR, prompt log,
-verification evidence, reflection) lives in [docs/midcourse/](docs/midcourse/).
-Run instructions: backend and frontend sections below apply unchanged;
-tests now run with `pytest tests -q` (26 tests).
-
-## Requirements
-
-- Python 3.10+
+- Python 3.10+ locally (CI and Docker use Python 3.11)
 - pip
+- Docker Desktop (only for the container workflow)
 
-## Setup
-
-1. Clone or copy this project, then from the project root create and
-   activate a virtual environment:
-
-   **Linux/macOS:**
-```bash
-   python3 -m venv venv
-   source venv/bin/activate
-```
-
-   **Windows PowerShell:**
-```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-```
-
-2. Install dependencies:
+## Local setup
 
 ```bash
-   pip install -r requirements.txt
+python -m venv venv
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# Linux/macOS:
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+# Windows PowerShell:
+Copy-Item .env.example .env
+# Linux/macOS:
+cp .env.example .env
 ```
 
-3. Create your local environment file from the example:
-
-   **Linux/macOS:**
-```bash
-   cp .env.example .env
-```
-
-   **Windows PowerShell:**
-```powershell
-   Copy-Item .env.example .env
-```
-
-## Run
-
-From the project root:
+## Run the app locally
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-The `--reload` flag restarts the server automatically on code changes
-(development only).
+Check it: `curl http://127.0.0.1:8000/health` → `{"status":"ok", ...}`.
+Swagger UI: http://127.0.0.1:8000/docs
 
-## Test the health endpoint
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Expected response shape:
-
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-08-14T12:34:56.789012+00:00"
-}
-```
-
-## Run the frontend (Module 3 Kanban board)
+### Run the frontend (Kanban board)
 
 The board lives in `frontend/index.html` and calls the API at
-`http://localhost:8000`. Serve it on port 5500 (the backend's CORS
-allowlist covers `http://localhost:5500` and `http://127.0.0.1:5500`):
-
-- **VS Code Live Server:** right-click `frontend/index.html` → *Open with
-  Live Server* (default port 5500), or
-- **Python:** from the project root run `python -m http.server 5500`,
-  then open http://localhost:5500/frontend/index.html
-
-Start the backend first (`uvicorn app.main:app --reload --port 8000`),
-otherwise the board shows its error state with a Retry button.
-
-Board features: three status columns (To Do / In Progress / Done), cards
-sorted High → Medium → Low, loading/empty/error/ready states,
-drag-and-drop that PATCHes the backend with rollback on failure, and a
-create/edit modal with title validation and server 422 handling.
-
-## Run the tests
+`http://localhost:8000`. Serve it on port 5500 (the CORS allowlist covers
+`http://localhost:5500` and `http://127.0.0.1:5500`; opening via `file://`
+is blocked):
 
 ```bash
-pytest tests/test_tasks.py -q
+python -m http.server 5500
+# then open http://localhost:5500/frontend/index.html
 ```
 
-Covers `POST /tasks`, `GET /tasks`, `PATCH /tasks/{id}` (validation,
-partial updates, 404s), and `DELETE /tasks/{id}`.
+Board features: three status columns, priority sorting (High → Medium → Low),
+loading/empty/error/ready states, drag-and-drop with PATCH + rollback,
+create/edit modal with validation and 422 display, due/overdue pills with an
+"Overdue only" filter, and tag chips with click-to-filter.
 
-## API documentation (Swagger UI)
+## Run tests
 
-With the server running, open:
+```bash
+pytest -v
+```
 
-http://127.0.0.1:8000/docs
+26 tests: `tests/test_tasks.py` (core CRUD/validation) and
+`tests/test_midcourse_features.py` (due dates, overdue filter, tags).
+
+## Run with Docker
+
+The container serves the **API only** (the frontend is served separately as
+above). Multi-stage build, `python:3.11-slim`, runs as non-root user `app`:
+
+```bash
+docker build -t task-tracker:dev .
+docker run -d --name tt-dev -p 8000:8000 task-tracker:dev
+curl http://localhost:8000/health
+docker exec tt-dev whoami   # expected: app
+docker rm -f tt-dev
+```
+
+Verification checklist and security log: `docs/module4/docker-verification.md`.
+
+## CI workflow
+
+`.github/workflows/ci.yml` runs on every push and pull request: checkout →
+Python 3.11 (pinned) → `pip install -r requirements.txt` → `pytest -v`.
+There is deliberately no `continue-on-error`, `|| true`, or `--exit-zero` —
+a failing test fails the run. Green→red→green proof: `docs/module4/ci-evidence.md`.
+Design rationale: [docs/decisions/ci-workflow-design.md](docs/decisions/ci-workflow-design.md).
+
+## Project structure
+
+```
+app/
+  main.py       # FastAPI app, CORS, all routes, overdue filter logic
+  models.py     # Pydantic models + ALL validation rules
+  storage.py    # In-memory dict store (module-level singleton)
+  config.py     # Env config via python-dotenv
+frontend/
+  index.html    # Kanban board (vanilla HTML/CSS/JS, single file)
+tests/
+  test_tasks.py                 # Core API tests (12)
+  test_midcourse_features.py    # Due dates + tags tests (14)
+docs/
+  midcourse/    # Mid-course project deliverables
+  module4/      # Module 4 evidence logs (review triage, claim-vs-reality, CI, Docker)
+  decisions/    # Technical decision notes
+.github/workflows/ci.yml
+Dockerfile / .dockerignore
+CLAUDE.md       # Project memory for Claude Code sessions
+```
+
+## Conventions and current limitations
+
+- Status values are exactly `ToDo`, `InProgress`, `Done` — **no transition
+  restrictions are implemented**; any status may move to any other.
+- Storage is in-memory by design: all tasks are lost on restart. SQLite is
+  planned for a later module. Not thread-safe; no auth; not production-ready.
+- PATCH semantics: omitted/`null` fields are not updated — so `assignee` and
+  `due_date` cannot be cleared once set; `tags` can be cleared with `[]`.
+- Overdue = `due_date < today AND status != Done`, computed server-side for
+  the filter and client-side for the card pill (may briefly disagree around
+  midnight across timezones).
+- Tag filtering is exact and case-sensitive.
+
+## Decision notes
+
+- [CI workflow design](docs/decisions/ci-workflow-design.md)
+- [Mid-course mini-ADR: due dates + tags](docs/midcourse/mini-adr.md)
