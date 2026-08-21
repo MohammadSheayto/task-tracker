@@ -30,6 +30,21 @@ MAX_TAGS = 10
 MAX_TAG_LENGTH = 30
 
 
+def _validate_title(v: str) -> str:
+    """Strip whitespace and validate title length.
+
+    Raises:
+        ValueError: If title is blank or exceeds 200 characters.
+    """
+    if isinstance(v, str):
+        v = v.strip()
+    if not v:
+        raise ValueError("title cannot be blank")
+    if len(v) > 200:
+        raise ValueError("title must not exceed 200 characters")
+    return v
+
+
 def _validate_tags(tags: Optional[list[str]]) -> Optional[list[str]]:
     """Trim tags, reject blank/overlong values, dedupe, and cap the count.
 
@@ -72,18 +87,8 @@ class TaskCreate(BaseModel):
     @field_validator("title", mode="before")
     @classmethod
     def validate_title(cls, v: str) -> str:
-        """Strip whitespace and validate title length.
-
-        Raises:
-            ValueError: If title is blank or exceeds 200 characters.
-        """
-        if isinstance(v, str):
-            v = v.strip()
-        if not v:
-            raise ValueError("title cannot be blank")
-        if len(v) > 200:
-            raise ValueError("title must not exceed 200 characters")
-        return v
+        """Validate the required title."""
+        return _validate_title(v)
 
     @field_validator("tags")
     @classmethod
@@ -111,20 +116,10 @@ class TaskUpdate(BaseModel):
     @field_validator("title", mode="before")
     @classmethod
     def validate_title(cls, v: Optional[str]) -> Optional[str]:
-        """Strip whitespace and validate title length when provided.
-
-        Raises:
-            ValueError: If title is blank or exceeds 200 characters.
-        """
+        """Validate the title when provided; None means not updated."""
         if v is None:
             return None
-        if isinstance(v, str):
-            v = v.strip()
-        if not v:
-            raise ValueError("title cannot be blank")
-        if len(v) > 200:
-            raise ValueError("title must not exceed 200 characters")
-        return v
+        return _validate_title(v)
 
     @field_validator("tags")
     @classmethod
