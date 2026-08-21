@@ -110,7 +110,9 @@ tests/
 docs/
   midcourse/    # Mid-course project deliverables
   module4/      # Module 4 evidence logs (review triage, claim-vs-reality, CI, Docker)
-  decisions/    # Technical decision notes
+  decisions/    # Technical decision notes (CI design, comments feature plan)
+  security-review.md / governance-worksheet.md / ai-playbook.md   # Module 5
+  architecture.md (+ architecture-A/B/C.md)                       # Module 5 context experiment
 .github/workflows/ci.yml
 Dockerfile / .dockerignore
 CLAUDE.md       # Project memory for Claude Code sessions
@@ -133,3 +135,5 @@ CLAUDE.md       # Project memory for Claude Code sessions
 
 - [CI workflow design](docs/decisions/ci-workflow-design.md)
 - [Mid-course mini-ADR: due dates + tags](docs/midcourse/mini-adr.md)
+- [Comments feature plan (Module 5, plan-only)](docs/decisions/comments-feature-plan.md)
+- [Security review](docs/security-review.md) · [Architecture](docs/architecture.md) · [AI playbook](docs/ai-playbook.md)
