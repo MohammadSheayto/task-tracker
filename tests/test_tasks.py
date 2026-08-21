@@ -35,7 +35,7 @@ def create_task(**overrides) -> dict:
 def test_create_task_returns_201_with_defaults():
     body = create_task()
     assert body["title"] == "Sample task"
-    assert body["status"] == "Todo"  # INTENTIONAL CI RED-RUN BREAK: correct value is "ToDo"
+    assert body["status"] == "ToDo"
     assert body["priority"] == "Medium"
     assert body["description"] == ""
     assert body["assignee"] is None
