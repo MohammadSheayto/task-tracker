@@ -9,6 +9,24 @@ module.
 API endpoints: `GET /health`, `POST /tasks`, `GET /tasks`,
 `GET /tasks/{id}`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`.
 
+## Mid-Course Project (branch `mid-course-project`)
+
+Two features added on top of Modules 1–3, end-to-end (backend +
+validation + pytest + frontend):
+
+- **Due dates + overdue filter** — optional `due_date` on tasks
+  (invalid dates → 422), due/overdue pill on cards, "Overdue only"
+  board filter backed by `GET /tasks?overdue=true|false` (overdue =
+  due date before today and status not Done).
+- **Tags / labels** — `tags` list on tasks (trimmed, blank values →
+  422, deduped, max 10 tags × 30 chars), tag chips on cards,
+  click-a-chip tag filter backed by `GET /tasks?tag=<value>`.
+
+Project documentation (user stories, mini-ADR, prompt log,
+verification evidence, reflection) lives in [docs/midcourse/](docs/midcourse/).
+Run instructions: backend and frontend sections below apply unchanged;
+tests now run with `pytest tests -q` (26 tests).
+
 ## Requirements
 
 - Python 3.10+
